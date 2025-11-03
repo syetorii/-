@@ -2,57 +2,47 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>DAUYS: Пиксельные выборы — 2022</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root{ --w:896px; --h:576px; }
-
+  :root{ --tile:64px; }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
   body{
-    background:#0e0e10; color:#e7f3d8;
-    font-family:"Press Start 2P",monospace; image-rendering:pixelated; overflow:hidden;
+    background:#0e0e10; color:#e7f3d8; font-family:"Press Start 2P",monospace;
+    image-rendering:pixelated; overflow:hidden;
   }
-
-  /* ===== UI каркас ===== */
-  #ui{
-    display:grid; grid-template-rows:auto 1fr auto;
-    position:fixed; inset:0; padding:10px; gap:8px;
-  }
+  #ui{display:grid;grid-template-rows:auto 1fr auto;position:fixed;inset:0;padding:14px;gap:8px}
   header,footer{display:flex;align-items:center;justify-content:space-between;font-size:12px}
-  .title{font-size:12px}
-  @media (max-width:480px){ .title{font-size:10px} }
 
-  /* ===== Сцена: логический размер + масштабирование ===== */
-  #viewport{
-    position:relative; width:100%; height:100%;
-    display:flex; align-items:center; justify-content:center;
-  }
-  /* «Стадия» — фикс. 896×576, на неё вешаем scale() */
-  #stage{
-    width:var(--w); height:var(--h);
-    transform-origin:top left; position:relative;
-  }
-
+  /* Сцена */
   #world{
-    position:absolute; inset:0; border:3px solid #333; border-radius:16px; overflow:hidden;
+    position:relative; margin:auto;
+    width:calc(var(--tile)*14); /* 896px */
+    height:calc(var(--tile)*9); /* 576px */
+    border:3px solid #333; border-radius:16px; overflow:hidden;
     background:#1a1a1d center/cover no-repeat;
     transition:background-image .3s ease;
   }
 
-  /* Кандидаты и реплики */
+  /* Кандидаты и их облачка */
   .candidate{
     position:absolute; top:100px; left:50%; transform:translateX(-50%);
     width:110px; height:110px; background:none; z-index:2;
   }
-  #cand1{ left:35%; }  #cand2{ left:65%; }
-  .candidate img{ width:100%;height:100%;object-fit:contain;border:none;background:transparent }
+  #cand1{ left:35%; }
+  #cand2{ left:65%; }
+
+  .candidate img{
+    width:100%; height:100%; object-fit:contain; image-rendering:pixelated;
+    border:none; border-radius:0; background:transparent;
+  }
 
   .speech{
-    position:absolute; top:100%; left:50%; transform:translate(-50%,10px);
+    position:absolute; top:100%; left:50%; transform:translate(-50%, 10px);
     background:#111827; border:2px solid #000; border-radius:8px;
-    padding:6px 8px; width:240px; text-align:center; font-size:10px; display:none; z-index:3;
+    padding:6px 8px; width:240px; text-align:center;
+    font-size:10px; display:none; z-index:3;
   }
 
   /* Игрок */
@@ -63,11 +53,25 @@
   .tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:9px;background:#000a;padding:2px 6px;border-radius:6px}
 
   /* Хитбоксы */
-  #desk,#ballotBox{position:absolute; cursor:pointer;}
+  #desk, #ballotBox{ position:absolute; cursor:pointer; }
 
   /* Панель действий */
   #actions{ position:absolute; z-index:5; display:flex; gap:8px; }
   .hidden{ display:none !important; }
+#controls{
+  position:fixed;          /* вместо absolute */
+  bottom:20px; right:20px;
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  z-index:9999;            /* гарантированно поверх сцены */
+  user-select:none;
+}
+#controls .ctrl{
+  touch-action:none;        /* не скроллить под пальцем */
+  -webkit-user-select:none; /* не выделять */
+  user-select:none;
+}
+#controls .mid{ display:flex; gap:4px; } /* чтобы средний ряд был в линию */
+
 
   /* Тост */
   #toast{
@@ -76,32 +80,25 @@
     font-size:10px; display:none; z-index:6;
   }
 
-  button{font:inherit;padding:8px 12px;background:#15151b;border:2px solid #333;color:#e7f3d8;border-radius:10px;cursor:pointer;box-shadow:0 2px 0 #0008}
-  button:active{transform:translateY(1px)} button[disabled]{opacity:.5;cursor:not-allowed}
+  button{font:inherit;padding:6px 10px;background:#15151b;border:2px solid #333;color:#e7f3d8;border-radius:10px;cursor:pointer;box-shadow:0 2px 0 #0008}
+  button:active{transform:translateY(1px)}
+  button[disabled]{opacity:.5; cursor:not-allowed}
 
-  /* ===== Модалка ===== */
-  #modal{ position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; z-index:10; }
-  #modalCard{ width:min(520px,92vw); background:#0f172a; border:3px solid #000; border-radius:14px; padding:14px; box-shadow:0 6px 0 #0008; }
+  /* ===== Модалка бюллетеня ===== */
+  #modal{
+    position:fixed; inset:0; background:#000a; display:none; align-items:center; justify-content:center; z-index:10;
+  }
+  #modalCard{
+    width:min(520px, 92vw); background:#0f172a; border:3px solid #000; border-radius:14px; padding:14px; box-shadow:0 6px 0 #0008;
+  }
   #modal h3{ font-size:12px; margin-bottom:10px }
-  .row{ display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap }
-  .row label{ font-size:10px; flex:1 1 180px; display:flex; flex-direction:column; gap:6px }
-  input,select{ font:inherit; padding:10px; border:2px solid #333; border-radius:10px; background:#0b1022; color:#e7f3d8; }
+  .row{ display:flex; gap:10px; margin-bottom:10px }
+  .row label{ font-size:10px; flex:1; display:flex; flex-direction:column; gap:6px }
+  input, select{
+    font:inherit; padding:8px; border:2px solid #333; border-radius:10px; background:#0b1022; color:#e7f3d8;
+  }
   .modalActions{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px }
   .error{ color:#fca5a5; font-size:10px; min-height:12px; }
-
-  /* ===== Мобильные кнопки управления ===== */
-  #controls{
-    position:fixed; right:14px; bottom:14px; z-index:9999;
-    display:flex; flex-direction:column; align-items:center; gap:6px; user-select:none;
-  }
-  #controls .mid{ display:flex; gap:6px }
-  #controls .ctrl{
-    width:clamp(56px,12vw,76px); height:clamp(56px,12vw,76px);
-    font-size:clamp(18px,4.2vw,26px); border:2px solid #333; border-radius:12px;
-    background:#1a1a1d; color:#e7f3d8; box-shadow:0 3px 0 #0008; touch-action:none;
-  }
-  @media (min-width:900px){ #controls{ display:none } } /* прячем на десктопе */
-
 </style>
 </head>
 <body>
@@ -111,39 +108,35 @@
     <div id="roomLabel">дауыс беру бөлмесі · 2022 жыл</div>
   </header>
 
-  <!-- Вьюпорт: центрируем и масштабируем «сцену» -->
-  <div id="viewport">
-    <div id="stage">
-      <main id="world">
-        <!-- кандидаты -->
-        <div id="cand1" class="candidate">
-          <img src="" alt=""><div class="speech"></div>
-        </div>
-        <div id="cand2" class="candidate">
-          <img src="" alt=""><div class="speech"></div>
-        </div>
-
-        <!-- зоны -->
-        <div id="desk" title="Стол"></div>
-        <div id="ballotBox" title="Урна"></div>
-
-        <!-- игрок -->
-        <div id="player"><div class="tag">Вы</div></div>
-
-        <!-- действия и тост -->
-        <div id="actions" class="hidden">
-          <button id="takeBtn" class="btn">📄 Бюллетень алу</button>
-          <button id="voteBtn" class="btn">🗳️ Дауыс беру</button>
-        </div>
-        <div id="toast">Сіз дауыс бердіңіз!</div>
-      </main>
-    </div>
+ <main id="world">
+  <!-- кандидаты -->
+  <div id="cand1" class="candidate">
+    <img src="" alt="">
+    <div class="speech"></div>
+  </div>
+  <div id="cand2" class="candidate">
+    <img src="" alt="">
+    <div class="speech"></div>
   </div>
 
-  <footer><div style="font-size:10px;opacity:.7">© Аллаберген Аяулым</div></footer>
-</div>
+  <!-- зоны -->
+  <div id="desk" title="Стол"></div>
+  <div id="ballotBox" title="Урна"></div>
 
-<!-- Кнопки управления (тач) -->
+  <!-- игрок -->
+  <div id="player"><div class="tag">Вы</div></div>
+
+  <!-- действия -->
+  <div id="actions" class="hidden">
+    <button id="takeBtn" class="btn">📄 Бюллетень алу</button>
+    <button id="voteBtn" class="btn">🗳️ Дауыс беру</button>
+  </div>
+
+  <!-- тост -->
+  <div id="toast">Сіз дауыс бердіңіз!</div>
+</main>
+
+<!-- КНОПКИ УПРАВЛЕНИЯ ДЛЯ ТАЧ -->
 <div id="controls">
   <button class="ctrl" data-dir="up">▲</button>
   <div class="mid">
@@ -153,18 +146,30 @@
   </div>
 </div>
 
-<!-- Модалка -->
+
+  <footer><div style="font-size:10px;opacity:.7">© Аллаберген Аяулым</div></footer>
+</div>
+
+<!-- ===== MODAL: заполнение бюллетеня ===== -->
 <div id="modal">
   <form id="ballotForm" id="modalCard">
     <div id="modalCard">
       <h3>Дауыс беру парағын толтыру</h3>
       <div class="row">
-        <label>Аты <input id="firstName" type="text" placeholder="Атыңыз" required></label>
-        <label>Тегі <input id="lastName" type="text" placeholder="Тегіңіз" required></label>
+        <label>Аты
+          <input id="firstName" type="text" placeholder="Атыңыз" required>
+        </label>
+        <label>Тегі
+          <input id="lastName" type="text" placeholder="Тегіңіз" required>
+        </label>
       </div>
       <div class="row">
-        <label>Жасы <input id="age" type="number" min="18" max="120" placeholder="18" required></label>
-        <label>Кандидат <select id="candidateSelect" required></select></label>
+        <label>Жасы
+          <input id="age" type="number" min="18" max="120" placeholder="18" required>
+        </label>
+        <label>Кандидат
+          <select id="candidateSelect" required></select>
+        </label>
       </div>
       <div class="error" id="formError"></div>
       <div class="modalActions">
@@ -176,76 +181,107 @@
 </div>
 
 <script>
-/* ===== ДАННЫЕ ===== */
+/* ---------- ДАННЫЕ (2 кандидата) ---------- */
 const ROOM = {
   year: 2022,
   bg: "https://files.catbox.moe/n6digt.png",
   candidates: [
-    { name:"Қасым-Жомарт Тоқаев", avatar:"https://files.catbox.moe/reltng.png",
-      phrases:["Әділ қазақстан - біздің мақсатымыз.","Ауылдар мен қалаларды дамыту.","Жаңа қазақстан!"] },
-    { name:"Меирам Кажыкен", avatar:"https://files.catbox.moe/963tgc.png",
-      phrases:["Болашаққа қадам!","Жаңа технологиялар.","Дамыған елдер тізіміне енеміз!"] }
+    {
+      name: "Қасым-Жомарт Тоқаев",
+      avatar: "https://files.catbox.moe/reltng.png",
+      phrases: [
+        "Әділ қазақстан - біздің мақсатымыз.", 
+        "Ауылдар мен қалаларды дамыту.", 
+        "Жаңа қазақстан!"
+      ]
+    },
+    {
+      name: "Меирам Кажыкен",               // ← замени
+      avatar: "https://files.catbox.moe/963tgc.png",          // ← замени путём к PNG
+      phrases: [
+        "Болашаққа қадам!",
+        "Жаңа технологиялар.",
+        "Дамыған елдер тізіміне енеміз!"
+      ]
+    }
   ],
-  layout:{ desk:{x:700,y:400,w:120,h:90}, box:{x:400,y:340,w:90,h:110} },
-  playerStart:{x:360,y:380}
+  layout: {
+    desk: { x: 700, y: 400, w: 120, h: 90 },
+    box:  { x: 400, y: 340, w:  90, h:110 }
+  },
+  playerStart: { x:360, y:380 }
 };
 
-/* ===== СЦЕНА/DOM ===== */
-const stage = document.getElementById('stage');
-const world = document.getElementById('world');
-const roomLabel = document.getElementById('roomLabel');
-const candEls = [document.getElementById('cand1'), document.getElementById('cand2')];
-const imgEls = candEls.map(c=>c.querySelector('img'));
-const speechEls = candEls.map(c=>c.querySelector('.speech'));
-const player = document.getElementById('player');
-const actions = document.getElementById('actions');
-const takeBtn = document.getElementById('takeBtn');
-const voteBtn = document.getElementById('voteBtn');
-const desk = document.getElementById('desk');
-const box = document.getElementById('ballotBox');
-const toast = document.getElementById('toast');
+/* ---------- DOM ---------- */
+const world      = document.getElementById('world');
+const roomLabel  = document.getElementById('roomLabel');
+const candEls    = [document.getElementById('cand1'), document.getElementById('cand2')];
+const imgEls     = candEls.map(c => c.querySelector('img'));
+const speechEls  = candEls.map(c => c.querySelector('.speech'));
+const player     = document.getElementById('player');
+const actions    = document.getElementById('actions');
+const takeBtn    = document.getElementById('takeBtn');
+const voteBtn    = document.getElementById('voteBtn');
+const desk       = document.getElementById('desk');
+const box        = document.getElementById('ballotBox');
+const toast      = document.getElementById('toast');
 
-/* ===== Масштаб под экран ===== */
-const BASE_W = 896, BASE_H = 576;
-function fit(){
-  const w = window.innerWidth - 20;     // чуть меньше, чтобы не упираться в края
-  const h = window.innerHeight - 110;   // минус хедер/футер
-  const s = Math.min(w/BASE_W, h/BASE_H);
-  stage.style.transform = `scale(${s})`;
-  // центрируем
-  stage.style.marginTop = `${(h - BASE_H*s)/2}px`;
-}
-addEventListener('resize', fit); addEventListener('orientationchange', fit);
+/* Modal DOM */
+const modal      = document.getElementById('modal');
+const ballotForm = document.getElementById('ballotForm');
+const firstName  = document.getElementById('firstName');
+const lastName   = document.getElementById('lastName');
+const ageInput   = document.getElementById('age');
+const selectCand = document.getElementById('candidateSelect');
+const formError  = document.getElementById('formError');
+const cancelModal= document.getElementById('cancelModal');
 
-/* ===== Состояние и управление ===== */
-let keys={}, px=ROOM.playerStart.x, py=ROOM.playerStart.y, speed=3.0, facing='front';
-let hasPaper=false, voter=null, bubbleTimers=[null,null], hideTimers=[null,null];
+/* ---------- Состояние ---------- */
+let keys={}, px=ROOM.playerStart.x, py=ROOM.playerStart.y, speed=3.2, facing='front';
+let hasPaper=false;             // бюллетень заполнен и на руках
+let voter=null;                 // {firstName,lastName,age,candidateIdx}
+let bubbleTimers=[null,null], hideTimers=[null,null];
 
+/* ---------- Движение ---------- */
 addEventListener('keydown', e=>keys[e.key]=true);
 addEventListener('keyup',   e=>keys[e.key]=false);
-
+// === ВИРТ-СТРЕЛКИ (тач/мышь) ===
 const dirKey = { up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight' };
-document.querySelectorAll('#controls .ctrl').forEach(btn=>{
-  const key = dirKey[btn.dataset.dir]; if(!key) return;
-  const press = e=>{ e.preventDefault(); keys[key]=true; };
-  const rel   = e=>{ e.preventDefault(); keys[key]=false; };
-  btn.addEventListener('pointerdown', press, {passive:false});
-  btn.addEventListener('pointerup',   rel,   {passive:false});
-  btn.addEventListener('pointerleave',rel,   {passive:false});
-  btn.addEventListener('pointercancel',rel,  {passive:false});
-});
-window.addEventListener('pointerup', ()=>Object.values(dirKey).forEach(k=>keys[k]=false));
 
+document.querySelectorAll('#controls .ctrl').forEach(btn=>{
+  const key = dirKey[btn.dataset.dir];
+  if(!key) return;
+
+  const press   = (e)=>{ e.preventDefault(); keys[key] = true;  };
+  const release = (e)=>{ e.preventDefault(); keys[key] = false; };
+
+  // Pointer-события покрывают и тач, и мышь
+  btn.addEventListener('pointerdown', press,   {passive:false});
+  btn.addEventListener('pointerup',   release, {passive:false});
+  btn.addEventListener('pointerleave',release, {passive:false});
+  btn.addEventListener('pointercancel',release,{passive:false});
+});
+
+// На всякий случай: отпускаем всё при уходе со страницы / потере фокуса
+window.addEventListener('pointerup',   ()=>{ Object.keys(dirKey).forEach(d=>keys[dirKey[d]]=false); });
+window.addEventListener('blur',        ()=>{ Object.keys(dirKey).forEach(d=>keys[dirKey[d]]=false); });
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) Object.keys(dirKey).forEach(d=>keys[dirKey[d]]=false);
+});
 function move(){
-  const r=world.getBoundingClientRect(); // уже масштабирован
+  const r=world.getBoundingClientRect();
   let moved=false;
   if(keys['ArrowLeft']||keys['a']) { px-=speed; facing='left'; moved=true; }
   if(keys['ArrowRight']||keys['d']){ px+=speed; facing='right'; moved=true; }
   if(keys['ArrowUp']||keys['w'])   { py-=speed; facing='back'; moved=true; }
   if(keys['ArrowDown']||keys['s']) { py+=speed; facing='front'; moved=true; }
-  px=Math.max(10, Math.min(BASE_W-160, px));
-  py=Math.max(10, Math.min(BASE_H-160, py));
-  player.style.left=px+'px'; player.style.top=py+'px';
+
+  px=Math.max(10, Math.min(r.width-160, px));
+  py=Math.max(10, Math.min(r.height-160, py));
+
+  player.style.left=px+'px';
+  player.style.top =py+'px';
+
   if(moved) updateSprite();
   checkProximity();
   requestAnimationFrame(move);
@@ -253,85 +289,146 @@ function move(){
 requestAnimationFrame(move);
 
 function updateSprite(){
-  const map={front:"https://files.catbox.moe/6yemkc.png",
-             back :"https://files.catbox.moe/vmul5g.png",
-             left :"https://files.catbox.moe/ahsbh6.png",
-             right:"https://files.catbox.moe/lo8v7p.png"};
-  player.style.backgroundImage=`url(${map[facing]})`;
+  const map={
+    front:"https://files.catbox.moe/6yemkc.png",
+    back :"https://files.catbox.moe/vmul5g.png",
+    left :"https://files.catbox.moe/ahsbh6.png",
+    right:"https://files.catbox.moe/lo8v7p.png"
+  };
+  player.style.backgroundImage = `url(${map[facing]})`;
 }
 
-/* ===== Взаимодействия ===== */
+/* ---------- Взаимодействие ---------- */
 function rect(el){ return el.getBoundingClientRect() }
 function near(ax,ay,bx,by,dist){ return Math.hypot(ax-bx, ay-by) < dist }
+
 function checkProximity(){
   const pr = rect(player), wr = rect(world);
   const pw = pr.left - wr.left + pr.width/2, ph = pr.top - wr.top + pr.height/2;
+
   const dr = rect(desk), dw = dr.left - wr.left + dr.width/2, dh = dr.top - wr.top + dr.height/2;
   const br = rect(box),  bw = br.left - wr.left + br.width/2, bh = br.top - wr.top + br.height/2;
+
   let shown=false;
-  if(near(pw,ph,dw,dh,90)){ actions.classList.remove('hidden'); actions.style.left=(dw-80)+'px'; actions.style.top=(dr.top-wr.top-30)+'px'; takeBtn.style.display='inline-block'; shown=true; }
-  else takeBtn.style.display='none';
-  if(hasPaper && near(pw,ph,bw,bh,90)){ actions.classList.remove('hidden'); actions.style.left=(bw-80)+'px'; actions.style.top=(br.top-wr.top-30)+'px'; voteBtn.style.display='inline-block'; shown=true; }
-  else voteBtn.style.display='none';
+
+  // стол
+  if(near(pw,ph,dw,dh,90)){
+    actions.classList.remove('hidden');
+    actions.style.left = (dw - 80) + 'px';
+    actions.style.top  = (dr.top - wr.top - 30) + 'px';
+    takeBtn.style.display='inline-block';
+    shown=true;
+  } else takeBtn.style.display='none';
+
+  // урна
+  if(hasPaper && near(pw,ph,bw,bh,90)){
+    actions.classList.remove('hidden');
+    actions.style.left = (bw - 80) + 'px';
+    actions.style.top  = (br.top - wr.top - 30) + 'px';
+    voteBtn.style.display='inline-block';
+    shown=true;
+  } else voteBtn.style.display='none';
+
   if(!shown) actions.classList.add('hidden');
 }
 
-/* ===== Модалка ===== */
-const modal=document.getElementById('modal');
-const ballotForm=document.getElementById('ballotForm');
-const firstName=document.getElementById('firstName');
-const lastName=document.getElementById('lastName');
-const ageInput=document.getElementById('age');
-const selectCand=document.getElementById('candidateSelect');
-const formError=document.getElementById('formError');
-document.getElementById('cancelModal').onclick=()=>modal.style.display='none';
-
+/* === Модалка бюллетеня === */
 function openModal(){
-  selectCand.innerHTML = ROOM.candidates.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
-  formError.textContent=''; modal.style.display='flex';
+  // заполнить выпадающий список кандидатами
+  selectCand.innerHTML = ROOM.candidates
+    .map((c,i)=>`<option value="${i}">${c.name}</option>`).join('');
+  formError.textContent = '';
+  modal.style.display='flex';
 }
-takeBtn.onclick=openModal;
+function closeModal(){ modal.style.display='none'; }
 
-ballotForm.addEventListener('submit', e=>{
-  e.preventDefault();
-  const fn=firstName.value.trim(), ln=lastName.value.trim(), age=+ageInput.value, idx=+selectCand.value;
-  if(!fn||!ln||!age||age<18){ formError.textContent='Барлық жолдарды толтыр (18+)'; return; }
-  voter={firstName:fn,lastName:ln,age,candidateIdx:idx}; hasPaper=true;
-  takeBtn.textContent='📄 Бюллетень дайын'; takeBtn.disabled=true; modal.style.display='none';
-  toast.textContent='Бюллетень толтырылды. Қорапшаға барыңыз!'; toast.style.display='block';
-  clearTimeout(toast._t); toast._t=setTimeout(()=>toast.style.display='none',1500);
-});
-voteBtn.onclick=()=>{
-  if(!hasPaper||!voter) return;
-  hasPaper=false; voteBtn.style.display='none';
-  const chosen=ROOM.candidates[voter.candidateIdx]?.name||'—';
-  toast.textContent=`Сіз: ${chosen} — дауыс бердіңіз!`; toast.style.display='block';
-  clearTimeout(toast._t); toast._t=setTimeout(()=>toast.style.display='none',1800);
-  takeBtn.textContent='📄 Бюллетень алу'; takeBtn.disabled=false;
+takeBtn.onclick = () => {
+  openModal(); // теперь «Взять бюллетень» открывает форму
 };
 
-/* ===== Реплики ===== */
-function speakLoop(idx,phrases){
-  const bubble=speechEls[idx];
+cancelModal.onclick = closeModal;
+
+ballotForm.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const fn = firstName.value.trim();
+  const ln = lastName.value.trim();
+  const age= Number(ageInput.value);
+  const idx= Number(selectCand.value);
+
+  if(!fn || !ln || !age || age<18){
+    formError.textContent = 'Заполни все поля. Возраст — от 18.';
+    return;
+  }
+
+  voter = { firstName: fn, lastName: ln, age, candidateIdx: idx };
+  hasPaper = true;
+
+  // визуальная обратная связь
+  takeBtn.textContent = '📄 Бюллетень дайын.';
+  takeBtn.disabled = true;
+  closeModal();
+
+  toast.textContent = 'Бюллетень толтырылды. Қорапшаға барыңыз!';
+  toast.style.display='block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> toast.style.display='none', 1500);
+});
+
+/* Голосование */
+voteBtn.onclick=()=>{ 
+  if(!hasPaper || !voter) return;
+  hasPaper=false; 
+  voteBtn.style.display='none';
+
+  const chosen = ROOM.candidates[voter.candidateIdx]?.name || '—';
+  toast.textContent = `Сіз: ${chosen} — дауыс бердіңіз!`;
+  toast.style.display='block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> toast.style.display='none', 1800);
+
+  // разрешим взять новый бюллетень (по желанию)
+  takeBtn.textContent = '📄 Бюллетень алу';
+  takeBtn.disabled = false;
+};
+
+/* ---------- Реплики кандидатов ---------- */
+function speakLoop(idx, phrases){
   clearInterval(bubbleTimers[idx]);
-  const say=()=>{
-    if(!phrases?.length){ bubble.style.display='none'; return; }
-    bubble.textContent=phrases[Math.floor(Math.random()*phrases.length)];
-    bubble.style.display='block'; clearTimeout(hideTimers[idx]); hideTimers[idx]=setTimeout(()=>bubble.style.display='none',7000);
+  const bubble = speechEls[idx];
+
+  const say = () => {
+    if(!phrases || !phrases.length){ bubble.style.display='none'; return; }
+    const t = phrases[Math.floor(Math.random()*phrases.length)];
+    bubble.textContent = t;
+    bubble.style.display = 'block';
+    clearTimeout(hideTimers[idx]);
+    hideTimers[idx] = setTimeout(()=> bubble.style.display='none', 8000);
   };
-  say(); bubbleTimers[idx]=setInterval(say,10000+Math.random()*4000);
+
+  say();
+  bubbleTimers[idx] = setInterval(say, 11000 + Math.random()*4000);
 }
 
-/* ===== Инициализация ===== */
+/* ---------- Применяем раскладку и фон ---------- */
+function applyLayout(L){
+  Object.assign(desk.style, { left:L.desk.x+'px', top:L.desk.y+'px', width:L.desk.w+'px', height:L.desk.h+'px' });
+  Object.assign(box.style,  { left:L.box.x +'px', top:L.box.y +'px', width:L.box.w +'px', height:L.box.h +'px' });
+}
+
+/* ---------- Инициализация ---------- */
 function init(){
-  world.style.backgroundImage=`url(${ROOM.bg})`;
-  roomLabel.textContent=`Дауыс беру бөлмесі · ${ROOM.year}`;
-  ROOM.candidates.forEach((c,i)=>{ imgEls[i].src=c.avatar||''; speakLoop(i,c.phrases||[]); });
-  const L=ROOM.layout;
-  Object.assign(desk.style,{left:L.desk.x+'px',top:L.desk.y+'px',width:L.desk.w+'px',height:L.desk.h+'px'});
-  Object.assign(box.style ,{left:L.box.x+'px' ,top:L.box.y+'px' ,width:L.box.w+'px' ,height:L.box.h+'px' });
-  player.style.left=ROOM.playerStart.x+'px'; player.style.top=ROOM.playerStart.y+'px';
-  fit();
+  world.style.backgroundImage = `url(${ROOM.bg})`;
+  roomLabel.textContent = `Дауыс беру бөлмесі · ${ROOM.year}`;
+
+  ROOM.candidates.forEach((c, i)=>{
+    imgEls[i].src = c.avatar || '';
+    speakLoop(i, c.phrases || []);
+  });
+
+  applyLayout(ROOM.layout);
+
+  player.style.left = ROOM.playerStart.x+'px';
+  player.style.top  = ROOM.playerStart.y+'px';
 }
 init();
 </script>
